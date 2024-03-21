@@ -1,12 +1,11 @@
 import modules.scripts as scripts
 import gradio as gr
 import os
-import time
+import requests
+from io import BytesIO
+from modules import script_callbacks
+from PIL import Image
 
-from modules import images, script_callbacks
-from modules.processing import process_images, Processed
-from modules.processing import Processed
-from modules.shared import opts, cmd_opts, state
 
 ext_path = scripts.basedir()
 
@@ -48,7 +47,7 @@ def on_ui_tabs():
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 
-class ExtensionTemplateScript(scripts.Script):
+class T2ACloudExtension(scripts.Script):
     def title(self):
         return "txt2any Cloud"
 
@@ -61,8 +60,21 @@ class ExtensionTemplateScript(scripts.Script):
                 checkbox_save_to_cloud = gr.inputs.Checkbox(label="Save to txt2any cloud", default=True)
                 return [checkbox_save_to_cloud]
 
-    # Extension main process
-    # Type: (StableDiffusionProcessing, List<UI>) -> (Processed)
-    # args is [StableDiffusionProcessing, UI1, UI2, ...]
     def postprocess(self, p, processed, checkbox_save_to_cloud):
+        if not checkbox_save_to_cloud:
+            return True
+
+        multiple_files = []
+
+        for i in range(len(processed.images)):
+            image = processed.images[i]
+            filename = image.already_saved_as.split('/')[-1]
+            file_upload = ('files', (filename, open(image.already_saved_as, 'rb'), 'image/png'))
+            multiple_files.append(file_upload)
+
+        url = 'http://0.0.0.0:8000/v1/images'
+        headers = {
+            'Authorization': f'Bearer {read_apikey()}'
+            }
+        r = requests.post(url, files=multiple_files, headers=headers)
         return True
